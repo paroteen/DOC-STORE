@@ -5,27 +5,34 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "fire
 import { auth } from "../lib/firebase";
 
 export default function AdminLogin() {
+  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    setError("");
+    
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
       navigate("/admin");
     } catch (err: any) {
-      if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
-        try {
-          await createUserWithEmailAndPassword(auth, email, password);
-          navigate("/admin");
-        } catch (createErr: any) {
-          setError(createErr.message || "Invalid credentials");
-        }
+      console.error("Auth error:", err);
+      if (err.code === "auth/unauthorized-domain") {
+        setError("This domain is not authorized for Firebase Auth. Please add it in the Firebase Console.");
       } else {
-        setError(err.message || "Login failed");
+        setError(err.message || "Authentication failed. Please check your credentials.");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -39,7 +46,7 @@ export default function AdminLogin() {
           <h1 className="text-2xl font-semibold tracking-tight">Admin Access</h1>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleAuth} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">
               Email
@@ -70,10 +77,24 @@ export default function AdminLogin() {
 
           <button
             type="submit"
-            className="w-full bg-black text-white font-medium py-2 px-4 rounded-md hover:bg-gray-800 transition-colors focus:ring-2 focus:ring-offset-2 focus:ring-black outline-none"
+            disabled={loading}
+            className="w-full bg-black text-white font-medium py-2 px-4 rounded-md hover:bg-gray-800 transition-colors focus:ring-2 focus:ring-offset-2 focus:ring-black outline-none disabled:opacity-50"
           >
-            Sign In
+            {loading ? "Please wait..." : isSignUp ? "Create Account" : "Sign In"}
           </button>
+          
+          <div className="text-center mt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setError("");
+              }}
+              className="text-sm text-gray-500 hover:text-black transition-colors"
+            >
+              {isSignUp ? "Already have an account? Sign In" : "Need an account? Create one"}
+            </button>
+          </div>
         </form>
       </div>
     </div>
