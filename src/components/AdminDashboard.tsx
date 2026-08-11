@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Upload, FileText, Settings, Copy, Download, Trash2, PowerOff } from "lucide-react";
+import { auth, db } from "../lib/firebase";
+import { collection, getDocs, updateDoc, deleteDoc, doc as firestoreDoc, orderBy, query } from "firebase/firestore";
+import { signOut } from "firebase/auth";
 
 type Document = {
-  id: number;
+  id: string;
   token: string;
   title: string;
   status: string;
@@ -16,23 +19,26 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchDocuments();
-  }, []);
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        navigate("/admin/login");
+      } else {
+        fetchDocuments();
+      }
+    });
+    return () => unsubscribe();
+  }, [navigate]);
 
   const fetchDocuments = async () => {
     try {
-      const res = await fetch("/api/documents");
-      if (res.status === 401) {
-        navigate("/admin/login");
-        return;
-      }
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setDocuments(data);
-      } else {
-        console.error("Expected array but got:", data);
-        setDocuments([]);
-      }
+      const q = query(collection(db, "documents")); // orderBy requires composite index if not standard, let's keep it simple
+      const snapshot = await getDocs(q);
+      const docs: Document[] = [];
+      snapshot.forEach((doc) => {
+        docs.push({ id: doc.id, ...doc.data() } as Document);
+      });
+      docs.sort((a, b) => b.createdAt - a.createdAt);
+      setDocuments(docs);
     } catch (err) {
       console.error(err);
     } finally {
@@ -41,7 +47,7 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await signOut(auth);
     navigate("/admin/login");
   };
 
@@ -51,22 +57,20 @@ export default function AdminDashboard() {
     alert("Link copied!");
   };
 
-  const toggleStatus = async (id: number, currentStatus: string) => {
+  const toggleStatus = async (id: string, currentStatus: string) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
-    await fetch(`/api/documents/${id}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus }),
-    });
+    await updateDoc(firestoreDoc(db, "documents", id), { status: newStatus });
     fetchDocuments();
   };
 
-  const deleteDoc = async (id: number) => {
+  const deleteDocument = async (id: string) => {
     if (confirm("Are you sure you want to delete this document permanently?")) {
-      await fetch(`/api/documents/${id}`, { method: "DELETE" });
+      await deleteDoc(firestoreDoc(db, "documents", id));
+      // Optionally delete from Firebase Storage if possible, or leave it orphaned for now
       fetchDocuments();
     }
   };
+
 
   if (loading) return <div className="min-h-screen bg-[#F3F4F6] flex items-center justify-center text-[#1A1A1B] font-sans">Loading...</div>;
 
@@ -151,7 +155,7 @@ export default function AdminDashboard() {
                         >
                           <PowerOff className="w-4 h-4" />
                         </button>
-                        <button onClick={() => deleteDoc(doc.id)} className="text-red-500 hover:text-red-700" title="Delete">
+                        <button onClick={() => deleteDocument(doc.id)} className="text-red-500 hover:text-red-700" title="Delete">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>

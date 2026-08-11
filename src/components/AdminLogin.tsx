@@ -1,8 +1,11 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock } from "lucide-react";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../lib/firebase";
 
 export default function AdminLogin() {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
@@ -10,19 +13,19 @@ export default function AdminLogin() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        navigate("/admin");
+      await signInWithEmailAndPassword(auth, email, password);
+      navigate("/admin");
+    } catch (err: any) {
+      if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
+        try {
+          await createUserWithEmailAndPassword(auth, email, password);
+          navigate("/admin");
+        } catch (createErr: any) {
+          setError(createErr.message || "Invalid credentials");
+        }
       } else {
-        setError(data.error || "Login failed");
+        setError(err.message || "Login failed");
       }
-    } catch (err) {
-      setError("An error occurred");
     }
   };
 
@@ -39,6 +42,19 @@ export default function AdminLogin() {
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-shadow"
+              required
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">
               Password
             </label>
             <input
@@ -47,7 +63,6 @@ export default function AdminLogin() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-shadow"
               required
-              autoFocus
             />
           </div>
 

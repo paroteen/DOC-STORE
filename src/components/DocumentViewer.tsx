@@ -1,30 +1,43 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Share2, Download, Printer } from "lucide-react";
+import { Share2, Download } from "lucide-react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../lib/firebase";
 
 export default function DocumentViewer() {
   const { token } = useParams();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    // Validate token
-    fetch(`/api/public/documents/${token}`)
-      .then((res) => {
-        if (!res.ok) {
-          if (res.status === 404) setError("Document not found");
-          else if (res.status === 403) setError("Document unavailable");
-          else setError("An error occurred");
-        }
-        setLoading(false);
-      })
-      .catch(() => {
-        setError("An error occurred");
-        setLoading(false);
-      });
-  }, [token]);
+    if (!token) return;
 
-  const pdfUrl = `/api/public/documents/${token}/pdf`;
+    const fetchDocument = async () => {
+      try {
+        const docRef = doc(db, "documents", token);
+        const docSnap = await getDoc(docRef);
+
+        if (!docSnap.exists()) {
+          setError("Document not found");
+        } else {
+          const data = docSnap.data();
+          if (data.status !== "active") {
+            setError("Document unavailable");
+          } else {
+            setPdfUrl(data.downloadUrl);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        setError("An error occurred");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDocument();
+  }, [token]);
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -47,10 +60,10 @@ export default function DocumentViewer() {
     return <div className="h-screen w-screen flex items-center justify-center bg-[#525659] text-white font-sans">Loading...</div>;
   }
 
-  if (error) {
+  if (error || !pdfUrl) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-[#F3F4F6] p-4 text-[#1A1A1B] font-sans">
-        <h1 className="text-xl font-medium">{error}</h1>
+        <h1 className="text-xl font-medium">{error || "Document not found"}</h1>
       </div>
     );
   }
@@ -78,6 +91,7 @@ export default function DocumentViewer() {
             <a 
               href={pdfUrl} 
               className="inline-flex items-center gap-2 bg-black/30 text-white px-4 py-2 rounded-md hover:bg-black/50 transition-colors font-medium text-sm"
+              download
             >
               <Download className="w-4 h-4" />
               Download PDF

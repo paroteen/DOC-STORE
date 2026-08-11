@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Upload, ArrowLeft, CheckCircle } from "lucide-react";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { setDoc, doc as firestoreDoc } from "firebase/firestore";
+import { storage, db, auth } from "../lib/firebase";
+import { nanoid } from "nanoid";
+import QRCode from "qrcode";
 
 export default function UploadDocument() {
   const [file, setFile] = useState<File | null>(null);
@@ -14,27 +19,46 @@ export default function UploadDocument() {
     e.preventDefault();
     if (!file) return;
 
+    if (!auth.currentUser) {
+      setError("You must be logged in to upload documents.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("title", title);
-
     try {
-      const res = await fetch("/api/documents", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
+      const token = nanoid(12);
+      const storageRef = ref(storage, `documents/${token}.pdf`);
       
-      if (res.ok) {
-        setResult(data);
-      } else {
-        setError(data.error || "Upload failed");
-      }
-    } catch (err) {
-      setError("An error occurred");
+      await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(storageRef);
+      const publicUrl = `${window.location.origin}/u/${token}`;
+
+      const newDoc = {
+        token,
+        title: title || file.name,
+        originalFilename: file.name,
+        storagePath: `documents/${token}.pdf`,
+        downloadUrl,
+        mimeType: file.type,
+        fileSize: file.size,
+        status: "active",
+        createdAt: Date.now()
+      };
+      
+      await setDoc(firestoreDoc(db, "documents", token), newDoc);
+
+      const qrDataUrl = await QRCode.toDataURL(publicUrl, {
+        width: 400,
+        margin: 2,
+        color: { dark: '#000000', light: '#ffffff' }
+      });
+      
+      setResult({ publicUrl, qrDataUrl });
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "An error occurred during upload");
     } finally {
       setLoading(false);
     }
