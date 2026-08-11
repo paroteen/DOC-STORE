@@ -1,28 +1,23 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock } from "lucide-react";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../lib/firebase";
 
 export default function AdminLogin() {
-  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     
     try {
-      if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, email, password);
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-      }
+      await signInWithEmailAndPassword(auth, email, password);
       navigate("/admin");
     } catch (err: any) {
       console.error("Auth error:", err);
@@ -46,7 +41,7 @@ export default function AdminLogin() {
           <h1 className="text-2xl font-semibold tracking-tight">Admin Access</h1>
         </div>
 
-        <form onSubmit={handleAuth} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">
               Email
@@ -80,21 +75,8 @@ export default function AdminLogin() {
             disabled={loading}
             className="w-full bg-black text-white font-medium py-2 px-4 rounded-md hover:bg-gray-800 transition-colors focus:ring-2 focus:ring-offset-2 focus:ring-black outline-none disabled:opacity-50"
           >
-            {loading ? "Please wait..." : isSignUp ? "Create Account" : "Sign In"}
+            {loading ? "Please wait..." : "Sign In"}
           </button>
-          
-          <div className="text-center mt-4">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setError("");
-              }}
-              className="text-sm text-gray-500 hover:text-black transition-colors"
-            >
-              {isSignUp ? "Already have an account? Sign In" : "Need an account? Create one"}
-            </button>
-          </div>
         </form>
       </div>
     </div>
