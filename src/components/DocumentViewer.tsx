@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Share2, Download } from "lucide-react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { supabase } from "../lib/supabase";
 
 export default function DocumentViewer() {
   const { token } = useParams();
@@ -15,17 +14,22 @@ export default function DocumentViewer() {
 
     const fetchDocument = async () => {
       try {
-        const docRef = doc(db, "documents", token);
-        const docSnap = await getDoc(docRef);
+        const { data, error: dbError } = await supabase
+          .from("documents")
+          .select("*")
+          .eq("token", token)
+          .single();
 
-        if (!docSnap.exists()) {
+        if (dbError || !data) {
           setError("Document not found");
         } else {
-          const data = docSnap.data();
           if (data.status !== "active") {
             setError("Document unavailable");
           } else {
-            setPdfUrl(data.downloadUrl);
+            const { data: urlData } = supabase.storage
+              .from("documents")
+              .getPublicUrl(`${data.token}.pdf`);
+            setPdfUrl(urlData.publicUrl);
           }
         }
       } catch (err) {

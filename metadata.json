@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Document Portal",
+  "description": "Secure document sharing portal with admin dashboard and token-based public viewer",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

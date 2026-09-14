@@ -1,9 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Upload, ArrowLeft, CheckCircle } from "lucide-react";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { setDoc, doc as firestoreDoc } from "firebase/firestore";
-import { storage, db, auth } from "../lib/firebase";
+import { supabase } from "../lib/supabase";
 import { nanoid } from "nanoid";
 import QRCode from "qrcode";
 
@@ -11,43 +9,75 @@ export default function UploadDocument() {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
   const [result, setResult] = useState<{ publicUrl: string; qrDataUrl: string } | null>(null);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate("/admin/login");
+      } else {
+        setAuthChecking(false);
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        navigate("/admin/login");
+      } else {
+        setAuthChecking(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
 
-    if (!auth.currentUser) {
-      setError("You must be logged in to upload documents.");
-      return;
-    }
-
     setLoading(true);
     setError("");
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("You must be logged in to upload documents.");
+      }
+
       const token = nanoid(12);
-      const storageRef = ref(storage, `documents/${token}.pdf`);
+      const filePath = `${token}.pdf`;
       
-      await uploadBytes(storageRef, file);
-      const downloadUrl = await getDownloadURL(storageRef);
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("documents")
+        .getPublicUrl(filePath);
+
+      const downloadUrl = urlData.publicUrl;
       const publicUrl = `${window.location.origin}/u/${token}`;
 
       const newDoc = {
         token,
         title: title || file.name,
-        originalFilename: file.name,
-        storagePath: `documents/${token}.pdf`,
-        downloadUrl,
-        mimeType: file.type,
-        fileSize: file.size,
         status: "active",
         createdAt: Date.now()
       };
       
-      await setDoc(firestoreDoc(db, "documents", token), newDoc);
+      const { error: dbError } = await supabase
+        .from("documents")
+        .insert([newDoc]);
+
+      if (dbError) throw dbError;
 
       const qrDataUrl = await QRCode.toDataURL(publicUrl, {
         width: 400,
@@ -63,6 +93,14 @@ export default function UploadDocument() {
       setLoading(false);
     }
   };
+
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-[#F3F4F6] flex items-center justify-center text-[#1A1A1B] font-sans">
+        Loading...
+      </div>
+    );
+  }
 
   if (result) {
     return (
@@ -92,13 +130,29 @@ export default function UploadDocument() {
               Download QR Code
             </a>
             <button 
-              onClick={() => {
-                navigator.clipboard.writeText(result.publicUrl);
-                alert("Link copied!");
+              onClick={async () => {
+                try {
+                  if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(result.publicUrl);
+                  } else {
+                    const ta = document.createElement("textarea");
+                    ta.value = result.publicUrl;
+                    ta.style.position = "fixed";
+                    ta.style.left = "-999999px";
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand("copy");
+                    ta.remove();
+                  }
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2500);
+                } catch (e) {
+                  console.error("Copy failed:", e);
+                }
               }}
               className="block w-full bg-gray-100 text-gray-900 py-2 px-4 rounded-md hover:bg-gray-200 transition-colors font-medium text-sm outline-none"
             >
-              Copy Link
+              {copied ? "Link Copied!" : "Copy Link"}
             </button>
             <Link 
               to="/admin"

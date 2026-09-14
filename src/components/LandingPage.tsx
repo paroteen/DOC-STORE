@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FileText, Shield, ArrowRight } from "lucide-react";
 
@@ -6,7 +6,7 @@ export default function LandingPage() {
   const [docCode, setDocCode] = useState("");
   const navigate = useNavigate();
 
-  const handleAccess = (e: React.FormEvent) => {
+  const handleAccess = (e: FormEvent) => {
     e.preventDefault();
     const code = docCode.trim();
     if (code) {
