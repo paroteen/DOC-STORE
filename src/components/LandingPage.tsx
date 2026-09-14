@@ -33,25 +33,25 @@ export default function LandingPage() {
           </div>
           
           <h1 className="text-2xl font-semibold text-gray-900 mb-3">
-            Document Portal
+            ALU Docs
           </h1>
           
           <p className="text-gray-500 text-sm leading-relaxed mb-6">
-            Welcome to the secure document sharing portal. Enter your document code below to access your file, or navigate to your specific link directly.
+            Welcome to the African Leadership University document portal. Enter your file code or email associated to check the document.
           </p>
 
-          <form onSubmit={handleAccess} className="flex gap-2">
+          <form onSubmit={handleAccess} className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
               value={docCode}
               onChange={(e) => setDocCode(e.target.value)}
-              placeholder="Enter document code..."
+              placeholder="Enter file code..."
               className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
               required
             />
             <button
               type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
               aria-label="Access document"
             >
               <ArrowRight className="w-4 h-4" />
@@ -61,7 +61,7 @@ export default function LandingPage() {
       </main>
 
       <footer className="w-full p-6 text-center text-xs text-gray-400">
-        &copy; {new Date().getFullYear()} Document Portal. All rights reserved.
+        &copy; {new Date().getFullYear()} African Leadership University. All rights reserved.
       </footer>
     </div>
   );
