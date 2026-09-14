@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { FileText, Copy, Check, Trash2, PowerOff, AlertCircle, RefreshCw } from "lucide-react";
+import { FileText, Copy, Check, Trash2, PowerOff, AlertCircle, RefreshCw, Upload } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
@@ -20,6 +20,9 @@ export default function AdminDashboard() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [confirmDeleteDoc, setConfirmDeleteDoc] = useState<Document | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [docToReplace, setDocToReplace] = useState<Document | null>(null);
+  const [isReplacing, setIsReplacing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -128,6 +131,44 @@ export default function AdminDashboard() {
       alert(err.message || "Failed to delete document");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleReplaceClick = (doc: Document) => {
+    setDocToReplace(doc);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !docToReplace) return;
+
+    if (file.type !== "application/pdf") {
+      alert("Please select a valid PDF file.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setIsReplacing(true);
+    setFetchError(null);
+    try {
+      const filePath = `${docToReplace.token}.pdf`;
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      alert(`Successfully replaced document: ${docToReplace.title}`);
+    } catch (err: any) {
+      console.error("Failed to replace document:", err);
+      setFetchError(err.message || "Failed to replace document.");
+    } finally {
+      setIsReplacing(false);
+      setDocToReplace(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -282,6 +323,14 @@ export default function AdminDashboard() {
                             <PowerOff className="w-4 h-4" />
                           </button>
                           <button
+                            onClick={() => handleReplaceClick(doc)}
+                            disabled={isReplacing}
+                            className="text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-50 transition-colors disabled:opacity-50"
+                            title="Replace PDF"
+                          >
+                            <Upload className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => setConfirmDeleteDoc(doc)}
                             className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors"
                             title="Delete"
@@ -298,6 +347,25 @@ export default function AdminDashboard() {
           </div>
         </div>
       </main>
+
+      {/* Hidden file input for replacing documents */}
+      <input
+        type="file"
+        accept="application/pdf"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
+      {/* Replacing indicator overlay */}
+      {isReplacing && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-xl border border-gray-100 flex items-center gap-3">
+            <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
+            <p className="text-gray-900 font-medium">Replacing PDF...</p>
+          </div>
+        </div>
+      )}
 
       {confirmDeleteDoc && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">

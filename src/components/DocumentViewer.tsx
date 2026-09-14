@@ -29,7 +29,7 @@ export default function DocumentViewer() {
             const { data: urlData } = supabase.storage
               .from("documents")
               .getPublicUrl(`${data.token}.pdf`);
-            setPdfUrl(urlData.publicUrl);
+            setPdfUrl(`${urlData.publicUrl}?t=${Date.now()}`);
           }
         }
       } catch (err) {
